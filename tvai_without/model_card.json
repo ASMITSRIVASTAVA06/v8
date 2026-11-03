@@ -1,0 +1,11 @@
+{
+  "trained_at": "2026-11-03 09:49",
+  "sklearn_version": "1.9.1",
+  "provenance": "synthetic",
+  "n_samples": 2799,
+  "metrics": {
+    "accuracy": 0.9081804242269358,
+    "macro_f1": 0.9081054124056761
+  },
+  "note": "random (not spatial) cross-validation"
+}

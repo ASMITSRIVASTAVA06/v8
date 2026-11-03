@@ -1,0 +1,51 @@
+# Weather and cyclone watch for the forest regions, every 6 hours.
+#
+# Optional repository secrets (whichever notification channel you want):
+#   SMTP_HOST, SMTP_USER, SMTP_PASSWORD, DIGEST_RECIPIENTS
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# No Earth Engine access is needed. The record of what was already announced is kept in the
+# Actions cache so the same warning is not sent every 6 hours.
+name: Scheduled weather watch
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "'all' or region names separated by ';'"
+        default: "all"
+      min_level:
+        description: "Alert from level: 1 Watch, 2 Warning, 3 Severe"
+        default: "2"
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Restore the record of sent alerts
+        uses: actions/cache@v4
+        with:
+          path: data_cache/weather_state.json
+          key: weather-state-${{ github.run_id }}
+          restore-keys: weather-state-
+
+      - name: Check weather and cyclones, alert if needed
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          DIGEST_RECIPIENTS: ${{ secrets.DIGEST_RECIPIENTS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scheduled_weather.py --regions "${{ github.event.inputs.regions || 'all' }}" \
+            --min-level "${{ github.event.inputs.min_level || '2' }}" --telegram

@@ -1,0 +1,58 @@
+# Weekly scan + digest of new alerts.
+#
+# Required repository secrets:
+#   GEE_PROJECT_ID, GEE_SERVICE_ACCOUNT_JSON      (Earth Engine, headless)
+# Optional secrets (whichever notification channel you want):
+#   SMTP_HOST, SMTP_USER, SMTP_PASSWORD, DIGEST_RECIPIENTS
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+#
+# The database (terravision.db) is what lets each scan say which alerts are new,
+# recurring or resolved. A GitHub runner is wiped after every run, so the file is
+# kept in the Actions cache. The cache is dropped if unused for 7 days; for a
+# long-lived archive run scheduled_scan.py with cron on an always-on machine instead
+# (or point TERRAVISION_DB at a persistent disk).
+name: Scheduled scan
+
+on:
+  schedule:
+    - cron: "0 1 * * 1"      # Mondays 01:00 UTC
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "'all' or region names separated by ';'"
+        default: "all"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Restore database and satellite cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            terravision.db
+            data_cache
+          key: terravision-${{ github.run_id }}
+          restore-keys: terravision-
+
+      - name: Scan and send digest
+        env:
+          GEE_PROJECT_ID: ${{ secrets.GEE_PROJECT_ID }}
+          GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          DIGEST_RECIPIENTS: ${{ secrets.DIGEST_RECIPIENTS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scheduled_scan.py --regions "${{ github.event.inputs.regions || 'all' }}" \
+            --telegram

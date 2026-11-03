@@ -1,0 +1,19 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      # Only what the tests import: no Earth Engine, Streamlit or rasterio needed.
+      - run: pip install numpy pandas scipy scikit-learn python-dotenv pytest
+      - run: python -m compileall -q .
+      - run: python -m pytest -q
